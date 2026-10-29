@@ -169,9 +169,11 @@ jobs:
             bash rollercoaster/build-rollercoaster.sh "$RUNNER_TEMP/tree" "${{ matrix.profile }}" "$JOBS"
 
       - name: Ringkasan hasil
-        run: |
-          ls -la artifact/
-          cd artifact && { sha256sum *.zip 2>/dev/null || true; } | tee SHA256SUMS.txt
+        # sengaja TIDAK menulis SHA256SUMS.txt di sini: nama berkas itu sama
+        # untuk setiap profil, jadi saat artifact digabung di job release
+        # isinya saling menimpa. Hash per profil sudah ditulis oleh
+        # build-rollercoaster.sh (<nama>.zip.sha256).
+        run: ls -la artifact/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -196,6 +198,7 @@ jobs:
           cd dist
           ls -la
           sha256sum *.zip > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Buat rilis
         env:
