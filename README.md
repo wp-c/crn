@@ -59,6 +59,19 @@ gh run watch
   = 4 vCPU), artifact 30 hari.
 * `release` — otomatis kalau push tag `v*`.
 
+## Status build
+
+Tiga profil utama sudah dibangun di GitHub Actions dan lolos seluruh jalur
+(patch → audit → `Image.gz` → AnyKernel3 → artifact):
+
+| Profil | Durasi (4 vCPU) | Artifact |
+|---|---|---|
+| roll | 9m03s | 21.147.113 B |
+| critical | 15m10s | 21.164.987 B |
+| chronicle | 20m22s | 21.163.698 B |
+
+Rincian: `docs/HASIL-BUILD-CI.md`. Yang **belum**: uji di perangkat.
+
 ## Struktur
 
 ```
@@ -83,6 +96,7 @@ tools/
 docs/
   OPTIMASI-1.3.0.md           semua perubahan + bukti + risiko + cara balik
   AUDIT-HASIL.txt             keluaran audit terakhir
+  HASIL-BUILD-CI.md           bukti build di GitHub Actions (durasi + artifact)
 ```
 
 ## Prinsip kerja proyek ini

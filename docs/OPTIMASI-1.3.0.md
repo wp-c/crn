@@ -233,15 +233,30 @@ kalau setelah tuning terasa lebih buruk, cukup `revert`, tanpa flash ulang.
 
 ---
 
-## 7. Belum dikerjakan (jujur)
+## 7. Sudah dibuktikan di GitHub Actions
 
-* **Belum ada build yang dijalankan di sesi ini** — sandbox kerja hanya 2 core /
-  3 GB dan tanpa toolchain clang; memaksakan build 4.14 di sana tidak akan
-  selesai. Yang sudah dijalankan: audit config penuh terhadap Kconfig tree
-  (lihat `docs/AUDIT-HASIL.txt`), `bash -n` untuk semua skrip, dan diff config
-  *resolved* sebelum/sesudah.
+Build nyata (bukan perkiraan) untuk **chronicle, critical, dan roll**:
+
+| Profil | Durasi (runner 4 vCPU, `-j4`) | Hasil |
+|---|---|---|
+| roll | 9m03s | ✅ zip 21.147.113 B |
+| critical | 15m10s | ✅ zip 21.164.987 B |
+| chronicle | 20m22s | ✅ zip 21.163.698 B |
+
+Ketiganya berjalan **paralel di tiga runner** (wall-clock ±20 menit untuk tiga
+kernel) dan melewati seluruh jalur: patch wajib → audit config di dalam tree →
+`make Image.gz` → paket AnyKernel3 + `ksud` → verifikasi isi zip → artifact.
+Rincian + link run: [`docs/HASIL-BUILD-CI.md`](HASIL-BUILD-CI.md).
+
+## 8. Belum dikerjakan (jujur)
+
 * **Belum ada uji di perangkat.** Semua klaim performa di dokumen ini adalah
   klaim **struktural** (jalur kode yang tidak lagi dieksekusi), bukan angka
-  benchmark. Angka nyata harus diukur di joyeuse/curtana.
-* LTO, patch stabil 358–370, dan `ioctl` KernelSU v2 untuk varian legacy masih
+  benchmark. Angka nyata harus diukur di joyeuse/curtana: `uname -r`,
+  `cat /proc/version`, `su -c id`, suhu saat main, dan FPS.
+* Build sandbox sesi ini (2 core / 3 GB, tanpa clang) hanya dipakai untuk
+  audit config + `bash -n` + diff config *resolved*; kompilasi penuh dilakukan
+  di GitHub Actions seperti tabel di atas.
+* LTO_CLANG, patch stabil 358–370 (Roll 3.3 melaporkan 370, tree publik masih
+  357), dan backport interface `ioctl` KernelSU v2 untuk varian legacy masih
   terbuka.
