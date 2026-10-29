@@ -125,15 +125,17 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            clang-18 lld-18 llvm-18 clang-tools-18 \
+            clang-18 lld-18 llvm-18 \
             ccache bc bison flex libssl-dev libelf-dev \
             zip unzip cpio xxd file python3 jq
 
       - name: Info mesin (untuk catatan di log)
         run: |
           echo "core: $(nproc)  RAM: $(free -g | awk '/^Mem:/{print $2}') GB"
-          clang --version | head -1
-          ld.lld --version
+          # versi toolchain bersifat informatif: jangan gagalkan job kalau
+          # binary-nya cuma ada dengan sufiks -18 (Ubuntu tidak membuat symlink)
+          /usr/lib/llvm-18/bin/clang --version | head -1 || clang-18 --version | head -1 || true
+          /usr/lib/llvm-18/bin/ld.lld --version || ld.lld-18 --version || true
 
       - name: Cache ccache
         uses: actions/cache@v4
