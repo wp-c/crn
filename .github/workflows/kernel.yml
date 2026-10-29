@@ -29,6 +29,11 @@ on:
         description: 'Job make (auto = nproc)'
         required: false
         default: 'auto'
+      config_only:
+        description: 'Hanya audit + bentuk .config (tanpa kompilasi)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -139,6 +144,8 @@ jobs:
         run: bash tools/fetch-ksud.sh
 
       - name: Build ${{ matrix.profile }}
+        env:
+          RC_CONFIG_ONLY: ${{ (github.event.inputs.config_only == 'true') && '1' || '0' }}
         run: |
           set -euo pipefail
           OUTDIR="$GITHUB_WORKSPACE/artifact" \
@@ -147,7 +154,7 @@ jobs:
       - name: Ringkasan hasil
         run: |
           ls -la artifact/
-          cd artifact && sha256sum *.zip | tee SHA256SUMS.txt
+          cd artifact && { sha256sum *.zip 2>/dev/null || true; } | tee SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
