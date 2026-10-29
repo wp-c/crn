@@ -1,0 +1,13 @@
+# hasil build
+output/
+out-*/
+*.zip
+*.sha256
+*.img
+
+# binary pihak ketiga (diambil saat build oleh tools/fetch-ksud.sh)
+rollercoaster/anykernel/ksud
+
+# alat bantu lokal
+.ccache/
+__pycache__/
