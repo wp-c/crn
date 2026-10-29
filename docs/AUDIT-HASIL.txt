@@ -1,0 +1,26 @@
+# Hasil audit config Rollercoaster 1.3.0
+# dibuat: 2026-10-29 03:39 UTC
+# tree  : Saamitk/kernel_xiaomi_sm6250-switchoff@a (4.14.357-openela)
+# alat  : tools/audit-config.py (kconfiglib (14, 1, 0))
+# cara  : SRC=<tree> python3 tools/audit-config.py <fragmen...>
+
+== 00-common.config, chronicle.config, 10-opt-common.config, 11-opt-aosp-only.config
+   89 simbol diminta · 89 efektif · 0 stale · 0 inert
+   HASIL: OK
+
+== 00-common.config, critical.config, 10-opt-common.config, 11-opt-aosp-only.config
+   105 simbol diminta · 105 efektif · 0 stale · 0 inert
+   HASIL: OK
+
+== 00-common.config, roll.config, 10-opt-common.config
+   113 simbol diminta · 113 efektif · 0 stale · 0 inert
+   HASIL: OK
+
+== 00-common.config, lite.config, 10-opt-common.config, 11-opt-aosp-only.config
+   92 simbol diminta · 92 efektif · 0 stale · 0 inert
+   HASIL: OK
+
+== 00-common.config, portn.config, 10-opt-common.config
+   117 simbol diminta · 117 efektif · 0 stale · 0 inert
+   HASIL: OK
+

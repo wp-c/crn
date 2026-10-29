@@ -1,0 +1,12 @@
+name=Rollercoaster
+version=1.3.0
+release=1
+base=4.14.357-openela
+device=miatoll (joyeuse, curtana, excalibur, gram, miatoll)
+manager=1.0.0-Rollercoaster (versionCode 10000, v2-only signing)
+build1=Chronicle   # KernelSU-Next, harian, fokus integrity/hiding
+build2=Lite        # NonKSU, harian, fokus baterai
+build3=Critical    # KernelSU-Next, gaming, HZ=300
+build4=Roll        # KernelSU-Next, satu paket AOSP + ROM port, NoMount
+build5=PortN       # KernelSU-Next, ROM port (tanpa NoMount), modul ROM boleh dimuat
+opt=1.3.0          # blok optimasi: 10-opt-common.config (+11-opt-aosp-only.config)

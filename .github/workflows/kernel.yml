@@ -1,0 +1,210 @@
+name: Rollercoaster kernel
+
+# Build kernel miatoll (4.14 non-GKI) di runner GitHub.
+#   . push ke main            -> audit config saja (cepat, tidak makan kuota)
+#   . workflow_dispatch       -> audit + build profil yang dipilih + artifact
+#   . tag v*                  -> audit + build semua profil + GitHub Release
+#
+# "max CPU": runner standar GitHub = 4 vCPU, jadi build memakai `-j$(nproc)`
+# (= 4). Runner besar (8/16 core) bisa dipakai kalau repo punya akses ke
+# larger runner — workflow ini tidak berubah, JOBS tetap `auto`.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+    # label `build` pada PR = jalankan build validasi (1 profil) di runner
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      profiles:
+        description: 'Profil yang dibangun (spasi), contoh: chronicle critical roll'
+        required: true
+        default: 'chronicle critical roll'
+      source_ref:
+        description: 'Branch/tag sumber kernel'
+        required: false
+        default: 'a'
+      jobs:
+        description: 'Job make (auto = nproc)'
+        required: false
+        default: 'auto'
+      config_only:
+        description: 'Hanya audit + bentuk .config (tanpa kompilasi)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_REPO: https://github.com/Saamitk/kernel_xiaomi_sm6250-switchoff.git
+  SOURCE_REF: ${{ github.event.inputs.source_ref || 'a' }}
+  JOBS: ${{ github.event.inputs.jobs || 'auto' }}
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 3G
+  CCACHE_COMPRESS: '1'
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+
+jobs:
+  # ---------------------------------------------------------------- audit ----
+  # Cepat (±2 menit) dan tidak butuh toolchain: memastikan setiap baris profil
+  # benar-benar berefek di tree (tidak ada simbol stale/inert).
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pasang kconfiglib
+        run: python3 -m pip install --quiet kconfiglib
+
+      - name: Ambil Kconfig tree (partial clone, ±25 MB)
+        run: bash tools/fetch-source.sh "$RUNNER_TEMP/src" --sparse
+
+      - name: Audit profil
+        run: |
+          set -euo pipefail
+          P=rollercoaster/profiles
+          fail=0
+          for c in chronicle critical roll lite portn; do
+            extra=""
+            case "$c" in chronicle|critical|lite) extra="$P/11-opt-aosp-only.config" ;; esac
+            echo "::group::audit $c"
+            SRC="$RUNNER_TEMP/src" python3 tools/audit-config.py \
+              "$P/00-common.config" "$P/$c.config" "$P/10-opt-common.config" $extra || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  # ---------------------------------------------------------------- setup ----
+  setup:
+    runs-on: ubuntu-24.04
+    needs: audit
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'pull_request' &&
+       (contains(github.event.pull_request.labels.*.name, 'build') ||
+        contains(github.event.pull_request.labels.*.name, 'build-all')))
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - id: list
+        env:
+          INPUT_PROFILES: ${{ github.event.inputs.profiles }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            workflow_dispatch) list="${INPUT_PROFILES:-chronicle critical roll}" ;;
+            # PR berlabel `build` = validasi cepat (1 profil);
+            # PR berlabel `build-all` = bangun 3 profil utama.
+            pull_request)
+              if printf '%s' "$LABELS" | grep -q build-all; then
+                list="chronicle critical roll"
+              else
+                list="chronicle"
+              fi ;;
+            *)                 list="chronicle critical roll lite" ;;
+          esac
+          json=$(printf '%s\n' $list | jq -R . | jq -sc .)
+          echo "matrix={\"profile\":$json}" >> "$GITHUB_OUTPUT"
+          echo "profil: $json"
+
+  # ---------------------------------------------------------------- build ----
+  build:
+    runs-on: ubuntu-24.04
+    needs: setup
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pasang toolchain (clang-18 + lld, 100% LLVM)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            clang-18 lld-18 llvm-18 \
+            ccache bc bison flex libssl-dev libelf-dev \
+            zip unzip cpio xxd file python3 jq
+
+      - name: Info mesin (untuk catatan di log)
+        run: |
+          echo "core: $(nproc)  RAM: $(free -g | awk '/^Mem:/{print $2}') GB"
+          # versi toolchain bersifat informatif: jangan gagalkan job kalau
+          # binary-nya cuma ada dengan sufiks -18 (Ubuntu tidak membuat symlink)
+          /usr/lib/llvm-18/bin/clang --version | head -1 || clang-18 --version | head -1 || true
+          /usr/lib/llvm-18/bin/ld.lld --version || ld.lld-18 --version || true
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.profile }}-${{ env.SOURCE_REF }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.profile }}-${{ env.SOURCE_REF }}-
+            ccache-
+
+      - name: Ambil tree kernel
+        run: bash tools/fetch-source.sh "$RUNNER_TEMP/tree"
+
+      - name: Ambil ksud (userspace KernelSU-Next)
+        run: bash tools/fetch-ksud.sh
+
+      - name: Build ${{ matrix.profile }}
+        env:
+          RC_CONFIG_ONLY: ${{ (github.event.inputs.config_only == 'true') && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          OUTDIR="$GITHUB_WORKSPACE/artifact" \
+            bash rollercoaster/build-rollercoaster.sh "$RUNNER_TEMP/tree" "${{ matrix.profile }}" "$JOBS"
+
+      - name: Ringkasan hasil
+        # sengaja TIDAK menulis SHA256SUMS.txt di sini: nama berkas itu sama
+        # untuk setiap profil, jadi saat artifact digabung di job release
+        # isinya saling menimpa. Hash per profil sudah ditulis oleh
+        # build-rollercoaster.sh (<nama>.zip.sha256).
+        run: ls -la artifact/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rollercoaster-${{ matrix.profile }}
+          path: artifact/*
+          if-no-files-found: error
+          retention-days: 30
+
+  # -------------------------------------------------------------- release ----
+  release:
+    runs-on: ubuntu-24.04
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Susun daftar berkas + hash
+        run: |
+          cd dist
+          ls -la
+          sha256sum *.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Buat rilis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Rollercoaster $GITHUB_REF_NAME" \
+            --notes "Dibangun otomatis oleh GitHub Actions (clang 18, LLVM_IAS, -j\$(nproc)). Isi: chronicle, critical, roll, lite + SHA256SUMS."
