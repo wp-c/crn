@@ -1,0 +1,2 @@
+# Tempatkan model quantized offline di sini, contoh: model.gguf
+# Jangan commit file model besar ke Git.
