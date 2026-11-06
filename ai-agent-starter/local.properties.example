@@ -1,0 +1,4 @@
+# Contoh: sesuaikan path Android SDK di komputer kamu
+sdk.dir=/home/user/Android/Sdk
+
+# API Key jangan disimpan di sini secara default; lihat MainActivity.kt
